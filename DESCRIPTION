@@ -1,0 +1,19 @@
+Package: glycoNativeMS
+Version: 0.0.2
+Date: 2016-05-18
+Title: Glyco Native Mass Spectrometry Analysis
+Description: Tools and data for glyco Native Mass Spectrometry Analysis,
+  especially the paper "Combining High-Resolution Native Mass Spectrometry 
+  with Middle-Down Proteomics for the Structural Analysis of 
+  Complex Glycoproteins and its usage to Score Biosimilarity".
+Author: Yang Yang <y.yang2@uu.nl>
+Maintainer: Yang Yang <y.yang2@uu.nl>
+Depends: R (>= 3.0.0)
+Imports: readr
+Suggests: psych
+License: file LICENSE
+URL: https://github.com/Yang0014/glycoNativeMS
+BugReports: https://github.com/Yang0014/glycoNativeMS/issues
+Type: Package
+NeedsCompilation: no
+LazyData: yes

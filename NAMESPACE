@@ -1,0 +1,10 @@
+
+
+
+### -----------------------------------------------------------------
+### Export non-generic functions
+###
+export(
+    # utilities.R
+    generatePseudoGaussianSpectrum
+    )

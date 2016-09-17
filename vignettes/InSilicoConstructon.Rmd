@@ -1,0 +1,392 @@
+---
+title: "An integrative approach that allows direct comparison of Middle-Down and native MS data"
+author: "Yang Yang"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_vignette:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{An integrative approach that allows direct comparison of Middle-Down and native MS data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{R, echo=TRUE, eval=TRUE}
+## Load the package
+library(glycoNativeMS)
+```
+
+```{R, echo=FALSE}
+knitr::opts_chunk$set(collapse=TRUE, comment="#>")
+```
+
+# Introduction
+This Vignette helps obtaining a comprehensive picture of protein PTMs 
+(including site specificity, stoichiometry, relative abundance and structure) 
+by integrating native MS and middle-down proteomic strategies.
+
+Here we use Fetuin as an example. An in silico simulation is performed combing
+the site-specific PTM information obtained by middle-down strategy. 
+The resulting constructed whole-protein picture allows us to directly 
+compare the middle-down
+experiments with native MS data, the calculated correlation score evaluates the
+reliability and integrity of all PTM assignments from both approaches.
+
+# The _in silico_ construction
+## Build up a PTM library
+First, we built up a PTM library based on the protein of interest.All the PTMs discovered by Middle-Down proteomics data should be included.
+
+Average masses were used for PTM calculation, 
+including
+
+Name of Modifications | Abbreviations | Mass
+-----|---------------|-----
+hexose/mannose/galactose | Hex/Man/Gal | 162.1424 Da
+N-acetylhexosamine/N-acetylglucosamine | HexNAc/GlcNAc | 203.1950 Da
+N-acetylneuraminic acid | Neu5Ac | 291.2579 Da
+N-glycolylneuraminic acid | Neu5Gc | 307.2573 Da
+phosphorylation | Pho |  79.9799 Da
+acetylation | Acetyl |  42.0373 Da
+–CH~3~ to –CH~2~OH replacement | Hydroxyl | 15.9994 Da
+
+Discovered glycan trees are built based on combination of monosachrides, 
+and the glycan masses are calculated accordinly.
+
+```{R, echo=TRUE, eval=TRUE}
+## Specify the monosaccharides involved in building up the N- and O-glycans
+glycoMass <- c("HexNAc"=203.1950, "Hex"=162.1424, "Fuc"=146.1430,
+               "Sia"=291.2579)
+##Building up the N- and O-glycans which are discovered in Middle-Down experiment
+glycoUnit <- matrix(c(6,5,3,0,
+                      6,5,4,0,
+                      7,6,4,0,
+                      7,6,5,0,
+                      5,4,2,0,
+                      5,4,3,0,
+                      6,5,3,1,
+                      6,5,2,0,
+                      1,1,1,0,
+                      1,1,2,0), ncol=4, byrow=TRUE,
+                    dimnames=list(c("Gal3Man3GlcNAc5Sia3Fuc0",
+                                    "Gal3Man3GlcNAc5Sia4Fuc0",
+                                    "Gal4Man3GlcNAc6Sia4Fuc0",
+                                    "Gal4Man3GlcNAc6Sia5Fuc0",
+                                    "Gal2Man3GlcNAc4Sia2Fuc0",
+                                    "Gal2Man3GlcNAc4Sia3Fuc0", 
+                                    "Gal3Man3GlcNAc5Sia3Fuc1", 
+                                    "Gal3Man3GlcNAc5Sia2Fuc0",              
+                                    "Hex1HexNAc1Sia1Fuc0", 
+                                    "Hex1HexNAc1Sia2Fuc0"),
+                                  c("Hex", "HexNAc", "Sia", "Fuc")))
+
+glycoUnit
+
+##Calculate the masses of glycan
+glycoUnitMass <- as.numeric(glycoUnit %*% glycoMass[colnames(glycoUnit)])
+names(glycoUnitMass) <- rownames(glycoUnit)
+glycoUnitMass
+```
+
+## Input the site-specific PTM info based on Middle-Down proteomics data
+The data construction is achieved based on the following three elements:
+
+1. the mass of the protein backbone retrieved from the protein sequence, 
+2. the masses of the PTMs on each modification sites as extracted from the middle-down data
+3. the relative abundances of site-specific PTMs extracted from LC chromatogram. 
+
+The mass of the polypeptide portion of a given protein, which is calculated using the backbone amino acid sequence corrected for disulfide bridges.
+```{R, echo=TRUE, eval=TRUE}                       
+backboneMass <- 36341.3240
+```
+
+Input site by site the discovered PTMs as well as their relative abundance, 
+based on Middle-Down experimental data. 
+For site-specific relative quantification, 
+the extracted ion chromatograms (XICs) were obtained using Skyline.
+
+```{R, echo=TRUE, eval=TRUE}
+#Site N99
+N99 <- glycoUnitMass[c("Gal3Man3GlcNAc5Sia3Fuc0", "Gal3Man3GlcNAc5Sia4Fuc0", 
+                       "Gal4Man3GlcNAc6Sia4Fuc0", "Gal3Man3GlcNAc5Sia2Fuc0",
+                       "Gal2Man3GlcNAc4Sia2Fuc0", "Gal2Man3GlcNAc4Sia3Fuc0",
+                       "Gal3Man3GlcNAc5Sia3Fuc1")]
+N99Abundance <- c(7975946.5, 1698123.71, 179075.46, 183750.7, 
+                  1800116.29, 112784.58, 135023.69)
+N99Abundance <- N99Abundance / sum(N99Abundance)
+names(N99Abundance) <- names(N99)
+N99Abundance
+
+#Site N176
+N176 <- c(0, glycoUnitMass[c("Gal3Man3GlcNAc5Sia3Fuc0",
+                             "Gal3Man3GlcNAc5Sia4Fuc0",
+                             "Gal2Man3GlcNAc4Sia2Fuc0",
+                             "Gal3Man3GlcNAc5Sia2Fuc0",
+                             "Gal3Man3GlcNAc5Sia3Fuc1",
+                             "Gal4Man3GlcNAc6Sia4Fuc0",
+                             "Gal4Man3GlcNAc6Sia5Fuc0")])
+
+N176Abundance <- c(569271.6, 1607595.51, 982022.02, 62781.17, 
+                   21558.26, 41144.05, 84709.56, 60000.00)
+N176Abundance <- N176Abundance / sum(N176Abundance)
+names(N176Abundance) <- names(N176)
+N176Abundance
+
+#Site N156
+N156 <- glycoUnitMass[c("Gal3Man3GlcNAc5Sia4Fuc0", 
+                        "Gal2Man3GlcNAc4Sia2Fuc0", 
+                        "Gal3Man3GlcNAc5Sia2Fuc0", 
+                        "Gal3Man3GlcNAc5Sia3Fuc0", 
+                         "Gal2Man3GlcNAc4Sia3Fuc0")]
+N156Abundance <- c(3003135.32, 6172856.75, 259047.65, 13255214.89, 284939.99)
+N156Abundance <- N156Abundance / sum(N156Abundance)
+names(N156Abundance) <- names(N156)
+N156Abundance
+
+#The long peptide which contains four potential O-glycan sites S271T280S282S296
+S271T280S282S296 <- glycoUnitMass[c("Hex1HexNAc1Sia1Fuc0", "Hex1HexNAc1Sia2Fuc0")]
+S271T280S282S296All <- matrix(c(1,0,
+                         0,1,
+                         2,0,
+                         1,1,
+                         3,0,
+                         2,1,
+                         1,2), byrow=TRUE, ncol=2)
+colnames(S271T280S282S296All) <- c("Hex1HexNAc1Sia1Fuc0", "Hex1HexNAc1Sia2Fuc0")
+S271T280S282S296One <- as.numeric(S271T280S282S296All %*% S271T280S282S296)
+S271T280S282S296OneAbundance <- c(418234513.5, 347819091.9, 2934190677, 
+                                  480754285.3, 2011130646, 3837471767, 
+                                  4587551906)
+S271T280S282S296OneAbundance <- S271T280S282S296OneAbundance / sum(S271T280S282S296OneAbundance)
+S271T280S282S296OneAbundance
+
+#Site S341
+S341 <- c(0, glycoUnitMass["Hex1HexNAc1Sia1Fuc0"])
+S341Abundance <- c(2549458484, 38921391.74)
+S341Abundance <- S341Abundance / sum(S341Abundance)
+S341Abundance
+
+#Phosphorylation site S320S323S325
+S320S323S325 <- c(0, 79.96633, 159.93266, 239.89899)
+S320S323S325Abundance <- c(5.71e11, 1.63e11, 6.73e10, 2.64e10)
+S320S323S325Abundance <- S320S323S325Abundance / sum(S320S323S325Abundance)
+S320S323S325Abundance
+
+#Phosphorylation site S134S138
+S134S138 <- c(0, 79.96633)
+S134S138Abundance <- c(1.22e13, 2.96e10)
+S134S138Abundance <- S134S138Abundance / sum(S134S138Abundance)
+S134S138Abundance
+```
+
+## Calculate all the PTM combinations
+Assembling the site-specific PTM characterization from middle-down proteomics
+altogether, we can _in silico_ construct an “intact protein spectrum” 
+containing all theoretically possible proteoforms, and also 
+calculate the relative abundance of each proteoform based on its 
+own PTM combination.
+
+```{R, echo=TRUE, eval=TRUE}
+allCombinations <- expand.grid(N99,
+                               N176, 
+                               N156,
+                               S271T280S282S296One,
+                               S341,
+                               S320S323S325,
+                               S134S138)
+head(allCombinations)
+
+allCombinationsAbundance <- expand.grid(N99Abundance,
+                                        N176Abundance,
+                                        N156Abundance,
+                                        S271T280S282S296OneAbundance,
+                                        S341Abundance,
+                                        S320S323S325Abundance,
+                                        S134S138Abundance)
+head(allCombinationsAbundance)
+
+simulated <- split(apply(allCombinationsAbundance, 1, prod), 
+                   rowSums(allCombinations))
+simulated <- sapply(simulated, sum)
+```
+
+#Compare the constructed spectrum with experimental native MS spectrum
+Here we compare the constructed result with the experimental native MS spectrum.
+
+## Include the charge state envelope
+
+To avoid artifacts possibly induced by spectra deconvolution, the constructed
+intact protein spectra are further processed to include a charge state envelope.
+In this regard, it can be directly compared with the unprocessed native MS data.
+
+The relative abundance of each charge state is estimated based on native MS 
+spectrum. The raw native MS spectrum is exported directly from 
+Xcalibur and saved as _txt_ format.)
+
+```{R, echo=TRUE, eval=TRUE, fig.width=7, fig.height=5}
+toPlot <- generatePseudoGaussianSpectrum(
+  x=as.numeric(names(simulated))+backboneMass,
+  y=100/max(simulated)*simulated,
+  sd=5,
+  xlim=c(40000, 50000))
+colours <- c("Simulated"="seagreen", "NativeMS"="darkgoldenrod3")
+plot(x=(toPlot[[1]]+12)/12, y=toPlot[[2]]*0.3, type="l", lwd=1,xlab="m/z",
+     ylab="abundance", col=colours[1], yaxs="i", 
+     xlim=c(2900,4300), ylim=c(-100,100))
+lines(x=(toPlot[[1]]+13)/13, y=toPlot[[2]], col=colours[1])
+lines(x=(toPlot[[1]]+14)/14, y=toPlot[[2]]*0.75, col=colours[1])
+lines(x=(toPlot[[1]]+15)/15, y=toPlot[[2]]*0.1, col=colours[1])
+
+fetuinFn <- file.path(system.file("extdata", package="glycoNativeMS"),
+                      "Fetuin_nativeMS.txt")
+data2 <- read.table(fetuinFn, header=FALSE, sep="\t")
+data2 <- transform(data2 , V2=-V2/max(V2)*100)
+lines(x=data2[[1]],   
+      y=data2[[2]], 
+      type="h", lwd=1,
+      col=colours[2])
+legend("topright", legend=names(colours), lty=1, col=colours)
+```
+
+##Calculate the correlation score
+
+A Pearson correlation is calculated to assess the similarity of simulated 
+and experimental spectra. 
+
+```{R, echo=TRUE, eval=TRUE}
+#Pearson crrelation 
+experimentalSpectrum <- data.frame(mass=data2[[1]],
+                                   abundance=-data2[[2]])
+foo <- as.numeric(names(simulated))+backboneMass
+fooAbundance <- 100/max(simulated)*simulated
+simulatedSpectrum <- data.frame(mass=c((foo+15)/15,(foo+12)/12, 
+                                       (foo+13)/13, (foo+14)/14),
+                                abundance=c(fooAbundance*0.1, fooAbundance*0.3,
+                                            fooAbundance, fooAbundance*0.75))
+```
+
+
+To further reduce the instrument noise level, 
+raw native MS spectra are pre-processed by binning adjacent data points 
+into a defined bin width, the constructed spectrum is processed using 
+the same defined range for comparison. Subsequently, the relative abundances
+within a bin are summed up. 
+
+For Fetuin, _m/z_ range 3000-4500 is considered. The bin width is decided by the instrument resolution and the noise level of the native MS spectrum 
+(in this case a bin width of 4 is used)
+
+```{R, echo=TRUE, eval=TRUE}
+ranges <- seq(3000, 4500, by=4)
+experimentalAggregated <- tapply(experimentalSpectrum$abundance,
+                                 cut(experimentalSpectrum$mass, ranges), 
+                                 sum, na.rm=TRUE)
+simulatedAggregated <- tapply(simulatedSpectrum$abundance, 
+                              cut(simulatedSpectrum$mass, ranges), 
+                              sum, na.rm=TRUE)
+## pearson correlation
+cor.test(experimentalAggregated, simulatedAggregated, use="complete.obs")
+```
+
+#Other Tools
+## Output the table including the full PTM combination 
+When proteins being examined contain multiple PTM sites, each _m/z_ peak in the
+native MS often consist of multiple proteoforms due to the combinatorial
+arrangement of different PTM sites possessing the same PTM composition and/or
+different PTM compositions that are close in mass. 
+
+Here we generate a table containing the  masses and relative abundances of 
+all possible proteoforms based on the construction. 
+
+```{R, echo=TRUE, eval=TRUE}
+simulatedAllCombinations <- 
+  data.frame(allCombinations, 
+             allCombinationsAbundance,
+             totalMass=rowSums(allCombinations)+backboneMass,
+             totalMZ=(rowSums(allCombinations)+backboneMass)/13,
+             totalAbundance=apply(allCombinationsAbundance, 1, prod),
+             relativeAbundance=100/max(simulated)*simulated[
+               as.character(rowSums(allCombinations))])
+colnames(simulatedAllCombinations)[1:14] <- c(rep("mass", 7), 
+                                              rep("abundance", 7))
+head(simulatedAllCombinations)
+```
+
+## Compare the similarity of different Native MS spectra
+
+The correlation score can also be used to assess the similarity of two native MS
+spectra. The application includes evaluating the analytical reproducibility 
+of native MS measuremnt, and further more, to compare the micro-heterogeneity 
+of different biosimilar samples.
+
+Here we make a comparison on 3 different EPO samples as well as their analytical duplicates.
+
+```{R, echo=TRUE, eval=TRUE, fig.width=10, fig.height=5}
+EPOFn <- file.path(system.file("extdata", package="glycoNativeMS"),
+                   c("Epoetin Beta native MS.txt", 
+                     "Epoetin Beta native MS Run2.txt", 
+                     "Epoetin Zeta native MS.txt", 
+                     "Epoetin Zeta native MS Run2.txt", 
+                     "EPO BRP native MS.txt", 
+                     "EPO BRP native MS Run2.txt"))
+library(psych)
+#sample files named "Run2" refer to the analytical duplicates of the same sample.
+beta <- read.table(EPOFn[1], sep="\t", header=FALSE, stringsAsFactors=FALSE)
+beta[[2]] <- 100/max(beta[[2]])*beta[[2]]
+beta2 <- read.table(EPOFn[2], sep="\t", header=FALSE, stringsAsFactors = FALSE)
+beta2[[2]] <- 100/max(beta2[[2]])*beta2[[2]]
+
+zeta <- read.table(EPOFn[3], sep="\t", header=FALSE, stringsAsFactors=FALSE)
+zeta[[2]] <- 100/max(zeta[[2]])*zeta[[2]]
+zeta2 <- read.table(EPOFn[4], header=FALSE, stringsAsFactors = FALSE)
+zeta2[[2]] <- 100/max(zeta2[[2]])*zeta2[[2]]
+
+BRP <- read.table(EPOFn[5],header=FALSE, stringsAsFactors=FALSE)
+BRP[[2]] <- 100/max(BRP[[2]])*BRP[[2]]
+BRP2 <- read.table(EPOFn[6],header = TRUE, stringsAsFactors = FALSE)
+BRP2[[2]] <- 100/max(BRP2[[2]])*BRP2[[2]]
+```
+
+Binning the data.
+
+```{R, echo=TRUE, eval=TRUE}
+ranges <- seq(2500, 4000, by=3)
+betaAggregated <- tapply(beta[[2]], cut(beta[[1]], ranges), sum, na.rm=TRUE)
+beta2Aggregated <- tapply(beta2[[2]], cut(beta2[[1]], ranges), sum, na.rm=TRUE)
+
+zetaAggregated <- tapply(zeta[[2]], cut(zeta[[1]], ranges), sum, na.rm=TRUE)
+zeta2Aggregated <- tapply(zeta2[[2]], cut(zeta2[[1]], ranges), sum, na.rm=TRUE)
+
+BRPAggregated <- tapply(BRP[[2]], cut(BRP[[1]], ranges), sum, na.rm=TRUE)
+BRP2Aggregated <- tapply(BRP2[[2]], cut(BRP2[[1]], ranges), sum, na.rm=TRUE)
+
+#correlation test between any two spectra
+cor.test(zeta2Aggregated, zetaAggregated, use="pairwise.complete.obs")
+cor.test(BRPAggregated, BRP2Aggregated, use="pairwise.complete.obs")
+cor.test(betaAggregated, beta2Aggregated, use="pairwise.complete.obs")
+```
+
+Generate an correlation heatmap.
+
+```{R, echo=TRUE, eval=TRUE, fig.width=7, fig.height=5}
+panel.pearson <- function(x, y, ...) {
+  horizontal <- (par("usr")[1] + par("usr")[2]) / 2;
+  vertical <- (par("usr")[3] + par("usr")[4]) / 2;
+  text(horizontal, vertical, format(abs(cor(exp(x),exp(y), use="pairwise.complete.obs")), digits=2))
+}
+
+foo <- data.frame(betaAggregated, beta2Aggregated,
+                  BRPAggregated, BRP2Aggregated,
+                  zetaAggregated, zeta2Aggregated)
+
+toPlot <- foo
+library(ggplot2)
+library(reshape2)
+
+toPlot2 <- melt(cor(toPlot, use="pairwise.complete.obs"))
+ggplot(toPlot2, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() + 
+  theme_bw() + xlab("") + ylab("") + 
+  scale_fill_continuous(limits=c(0.38, 1), low="deepskyblue4", high="gold") +
+  geom_text(aes(fill = toPlot2$value, label = round(toPlot2$value, 2)))
+
+```
+
